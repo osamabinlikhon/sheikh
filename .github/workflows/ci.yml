@@ -96,9 +96,10 @@ jobs:
                https://api.testcontainers.cloud/v1/health || echo "Testcontainers Cloud ready"
       
       - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && secrets.DOCKER_PAT != ''
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKER_USER }}
+          username: ${{ vars.DOCKER_USER || 'osamabinlikhon' }}
           password: ${{ secrets.DOCKER_PAT }}
       
       - name: Set up Docker Buildx with Testcontainers Cloud
@@ -108,32 +109,27 @@ jobs:
           endpoint: "osamabinlikhon/sheikh"
           buildkitd-flags: --allow-insecure-entitlement security.insecure
       
-      - name: Build and push with Testcontainers Cloud
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          tags: "${{ vars.DOCKER_USER }}/agent-sheikh:latest"
-          # For pull requests, export results to build cache
-          # Otherwise, push to a registry
-          outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          sbom: true
-          provenance: true
-      
       - name: Build individual components with Testcontainers Cloud
         run: |
           echo "🏗️ Building Agent Sheikh components with Testcontainers Cloud..."
           
+          # Determine if we should push
+          PUSH_ARG="--push"
+          if [[ "${{ github.event_name }}" == "pull_request" ]] || [[ -z "${{ secrets.DOCKER_PAT }}" ]]; then
+            PUSH_ARG=""
+            echo "⚠️ Skipping push (PR or missing secrets)"
+          fi
+
+          DOCKER_USER="${{ vars.DOCKER_USER || 'osamabinlikhon' }}"
+
           # Build backend
           echo "Building backend..."
           docker buildx build \
             --builder cloud-osamabinlikhon-sheikh \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.DOCKER_USER }}/agent-sheikh-backend:latest \
-            --tag ${{ vars.DOCKER_USER }}/agent-sheikh-backend:${{ github.sha }} \
-            --push \
+            --tag $DOCKER_USER/agent-sheikh-backend:latest \
+            --tag $DOCKER_USER/agent-sheikh-backend:${{ github.sha }} \
+            $PUSH_ARG \
             ./backend
           
           # Build frontend
@@ -141,9 +137,9 @@ jobs:
           docker buildx build \
             --builder cloud-osamabinlikhon-sheikh \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.DOCKER_USER }}/agent-sheikh-frontend:latest \
-            --tag ${{ vars.DOCKER_USER }}/agent-sheikh-frontend:${{ github.sha }} \
-            --push \
+            --tag $DOCKER_USER/agent-sheikh-frontend:latest \
+            --tag $DOCKER_USER/agent-sheikh-frontend:${{ github.sha }} \
+            $PUSH_ARG \
             ./frontend
           
           # Build sandbox
@@ -151,19 +147,20 @@ jobs:
           docker buildx build \
             --builder cloud-osamabinlikhon-sheikh \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.DOCKER_USER }}/agent-sheikh-sandbox:latest \
-            --tag ${{ vars.DOCKER_USER }}/agent-sheikh-sandbox:${{ github.sha }} \
-            --push \
+            --tag $DOCKER_USER/agent-sheikh-sandbox:latest \
+            --tag $DOCKER_USER/agent-sheikh-sandbox:${{ github.sha }} \
+            $PUSH_ARG \
             ./sandbox
       
       - name: Testcontainers Cloud build summary
         run: |
+          DOCKER_USER="${{ vars.DOCKER_USER || 'osamabinlikhon' }}"
           echo "🎉 Testcontainers Cloud build completed successfully!"
           echo "📊 Images built:"
-          echo "  - ${{ vars.DOCKER_USER }}/agent-sheikh:latest"
-          echo "  - ${{ vars.DOCKER_USER }}/agent-sheikh-backend:latest"
-          echo "  - ${{ vars.DOCKER_USER }}/agent-sheikh-frontend:latest"
-          echo "  - ${{ vars.DOCKER_USER }}/agent-sheikh-sandbox:latest"
+          # echo "  - $DOCKER_USER/agent-sheikh:latest"
+          echo "  - $DOCKER_USER/agent-sheikh-backend:latest"
+          echo "  - $DOCKER_USER/agent-sheikh-frontend:latest"
+          echo "  - $DOCKER_USER/agent-sheikh-sandbox:latest"
           echo ""
           echo "🚀 To deploy locally:"
           echo "  docker-compose up -d"
@@ -187,20 +184,21 @@ jobs:
         run: |
           export TC_CLOUD_TOKEN=${{ secrets.TC_CLOUD_TOKEN }}
           export TESTCONTAINERS_CLOUD_ENABLED=true
+          DOCKER_USER="${{ vars.DOCKER_USER || 'osamabinlikhon' }}"
           
           # Pull and test built images
           echo "📦 Pulling built images..."
-          docker pull ${{ vars.DOCKER_USER }}/agent-sheikh:latest
-          docker pull ${{ vars.DOCKER_USER }}/agent-sheikh-backend:latest
-          docker pull ${{ vars.DOCKER_USER }}/agent-sheikh-frontend:latest
-          docker pull ${{ vars.DOCKER_USER }}/agent-sheikh-sandbox:latest
+          # docker pull $DOCKER_USER/agent-sheikh:latest || echo "Image not found"
+          docker pull $DOCKER_USER/agent-sheikh-backend:latest
+          docker pull $DOCKER_USER/agent-sheikh-frontend:latest
+          docker pull $DOCKER_USER/agent-sheikh-sandbox:latest
           
           # Test components in Testcontainers Cloud
           echo "🧪 Testing Agent Sheikh components..."
           
           # Test backend health
           echo "Testing backend health..."
-          timeout 30s docker run --rm -p 8000:8000 ${{ vars.DOCKER_USER }}/agent-sheikh-backend:latest &
+          timeout 30s docker run --rm -p 8000:8000 $DOCKER_USER/agent-sheikh-backend:latest &
           sleep 10
           curl -f http://localhost:8000/health || echo "Backend health check completed"
           
