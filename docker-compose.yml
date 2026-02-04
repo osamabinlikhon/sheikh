@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Database Services
+  mongodb:
+    image: mongo:7.0
+    container_name: agent-sheikh-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: agent_sheikh
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - agent-sheikh-network
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: agent-sheikh-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - agent-sheikh-network
+
+  # Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agent-sheikh-backend
+    restart: unless-stopped
+    environment:
+      - PYTHON_ENV=production
+      - API_KEY=u2nkaN5BxVlI0ZfxP1ELKTKZ8Oz9eomf
+      - API_BASE=https://codestral.mistral.ai/v1
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017
+      - MONGODB_DATABASE=agent_sheikh
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - SANDBOX_NETWORK=agent-sheikh-network
+      - JWT_SECRET_KEY=agentsheikh-secret-key-change-in-production
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - agent-sheikh-network
+    depends_on:
+      - mongodb
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: agent-sheikh-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000/ws
+    networks:
+      - agent-sheikh-network
+    depends_on:
+      - backend
+
+  # Sandbox Network
+  sandbox-network:
+    image: agent-sheikh-sandbox:latest
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
+    container_name: agent-sheikh-sandbox-template
+    networks:
+      - agent-sheikh-network
+    profiles:
+      - sandbox-template
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  agent-sheikh-network:
+    driver: bridge

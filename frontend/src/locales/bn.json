@@ -1,0 +1,21 @@
+{
+  "common": {
+    "send": "পাঠান",
+    "cancel": "বাতিল",
+    "save": "সংরক্ষণ করুন"
+  },
+  "chat": {
+    "placeholder": "এজেন্ট শেখকে কিছু জিজ্ঞাসা করুন..."
+  },
+  "sidebar": {
+    "sessions": "সেশন",
+    "createNewSession": "নতুন সেশন তৈরি করুন"
+  },
+  "header": {
+    "chat": "চ্যাট",
+    "settings": "সেটিংস"
+  },
+  "footer": {
+    "copyright": "সর্বস্বত্ব সংরক্ষিত।"
+  }
+}

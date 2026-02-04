@@ -1,0 +1,21 @@
+{
+  "common": {
+    "send": "Send",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
+  "chat": {
+    "placeholder": "Ask Agent Sheikh anything..."
+  },
+  "sidebar": {
+    "sessions": "Sessions",
+    "createNewSession": "Create New Session"
+  },
+  "header": {
+    "chat": "Chat",
+    "settings": "Settings"
+  },
+  "footer": {
+    "copyright": "All rights reserved."
+  }
+}
